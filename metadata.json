@@ -1,0 +1,6 @@
+{
+  "name": "AgriConnect",
+  "description": "AgriConnect (AgriLink) - Better Markets. Better Prices. Better Farmers. Compare real-time market prices, discover best mandi returns, check crop quality with AI, and connect farmers directly with buyers.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
