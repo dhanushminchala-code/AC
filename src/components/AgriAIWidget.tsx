@@ -493,7 +493,7 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
         >
           {/* Header Bar */}
           <div className="bg-gradient-to-r from-[#0e6834] via-emerald-700 to-green-700 text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0 shadow-md">
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-xs">
                 <Bot className="w-6 h-6 text-white" />
               </div>
@@ -512,12 +512,12 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
             </div>
 
             {/* Actions: Language selector, Expand, Close */}
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <div className="relative shrink-0">
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
-                  className="bg-black/25 hover:bg-black/40 text-white text-[11px] font-semibold py-1 px-2 pr-6 rounded-lg border border-white/20 focus:outline-hidden cursor-pointer appearance-none"
+                  className="max-w-[108px] sm:max-w-none bg-black/25 hover:bg-black/40 text-white text-[11px] font-semibold py-1 px-2 pr-6 rounded-lg border border-white/20 focus:outline-hidden cursor-pointer appearance-none"
                   title="Choose conversation language"
                 >
                   {SUPPORTED_LANGUAGES.map((l) => (
