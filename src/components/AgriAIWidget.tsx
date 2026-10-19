@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Language, UserProfile } from '../types';
+import { Language, UserProfile, FarmerCropItem } from '../types';
+import { recommendedBuyersList } from '../data/mockData';
 import {
   MessageSquare,
   X,
@@ -22,6 +23,7 @@ import {
 interface AgriAIWidgetProps {
   lang: Language;
   currentUser?: UserProfile | null;
+  crops: FarmerCropItem[];
 }
 
 interface ChatMessage {
@@ -68,7 +70,7 @@ const SUGGESTED_PROMPTS = [
   },
 ];
 
-export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser }) => {
+export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, crops }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState<string>('auto');
   const [input, setInput] = useState('');
@@ -154,6 +156,37 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
         text: m.text,
       }));
 
+      const location = currentUser?.apmc
+        ? `${currentUser.apmc}${currentUser.state ? `, ${currentUser.state}` : ''}`
+        : '';
+      const savedCropRecords = (() => {
+        try { return Boolean(localStorage.getItem('agriconnect_crops')); } catch { return false; }
+      })();
+      const firstCrop = crops?.[0];
+      const cropForLookup = firstCrop?.cropKey || firstCrop?.name || '';
+      const [marketSnapshot, weatherSnapshot] = await Promise.all([
+        cropForLookup && location
+          ? fetch(`/api/market-prices?crop=${encodeURIComponent(cropForLookup)}&location=${encodeURIComponent(location)}&radius=150`)
+              .then(async (r) => r.ok ? (await r.json())?.data || null : null)
+              .catch(() => null)
+          : Promise.resolve(null),
+        location
+          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(location)}`)
+              .then(async (r) => r.ok ? await r.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      const buyerListings = recommendedBuyersList.slice(0, 10).map((buyer) => ({
+        companyName: buyer.companyName,
+        businessType: buyer.businessType,
+        requiredCrop: buyer.requiredCrop,
+        quantity: buyer.quantity,
+        location: buyer.location,
+        offeredPrice: buyer.offeredPrice,
+        sourceStatus: 'demo/sample listing; not a verified live offer',
+      }));
+
       const res = await fetch('/api/agri-ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +196,18 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
           context: {
             userName: currentUser?.name,
             role: currentUser?.role,
-            location: currentUser?.state ? `${currentUser.apmc || 'APMC'}, ${currentUser.state}` : 'Andhra Pradesh',
+            location: location || '',
+            farmCrops: (crops || []).map((crop) => ({
+              name: crop.name,
+              cropKey: crop.cropKey,
+              quantity: crop.quantity,
+              expectedPrice: crop.price,
+            })),
+            farmCropsSource: savedCropRecords ? 'localStorage app crop records' : 'demo starter crop records; not confirmed farmer data',
+            marketSnapshot,
+            weatherSnapshot,
+            buyerListings,
+            soilData: null,
           },
         }),
       });
