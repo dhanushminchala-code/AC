@@ -110,10 +110,10 @@ export const PriceDiscoveryPage: React.FC<PriceDiscoveryPageProps> = ({ lang, on
         }
       }
     } catch {
-      // Offline / fallback calculation
+      setLocationNotice('The market API is currently unavailable. Showing clearly labelled demonstration benchmark estimates instead.');
     }
 
-    const computed = computeMarketPrices(selectedCrop, location, 150);
+    const computed = computeMarketPrices(selectedCrop, `${location}, ${selectedState}`, 150);
     setPriceResult(computed);
     setIsDiscovering(false);
   };
@@ -156,6 +156,8 @@ export const PriceDiscoveryPage: React.FC<PriceDiscoveryPageProps> = ({ lang, on
                 <option value="tomato">Tomato</option>
                 <option value="chilli">Chilli</option>
                 <option value="cotton">Cotton</option>
+                <option value="potato">Potato</option>
+                <option value="maize">Maize</option>
               </select>
             </div>
 
@@ -227,9 +229,10 @@ export const PriceDiscoveryPage: React.FC<PriceDiscoveryPageProps> = ({ lang, on
             <div className="lg:col-span-2">
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-[#0e6834] hover:bg-[#0b542a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition active:scale-98 cursor-pointer"
+                disabled={isDiscovering}
+                className="w-full py-2.5 px-4 bg-[#0e6834] hover:bg-[#0b542a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition active:scale-98 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
               >
-                <span>Discover Prices →</span>
+                <span>{isDiscovering ? 'Searching…' : 'Discover Prices →'}</span>
               </button>
             </div>
           </form>
