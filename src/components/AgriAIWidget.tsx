@@ -483,7 +483,8 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Close chat"
-                className="p-1.5 rounded-lg hover:bg-white/15 text-white transition cursor-pointer"
+                title="Close AgriConnect AI"
+                className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/50 bg-white/15 text-white shadow-sm transition hover:bg-rose-600 hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
               >
                 <X className="w-5 h-5" />
               </button>
