@@ -6,10 +6,16 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { computeMarketPrices } from './src/services/marketPriceService';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load the secret from the project-root .env file, regardless of the terminal's working directory.
+const envResult = dotenv.config({ path: path.join(__dirname, '.env') });
+if (envResult.error && process.env.GEMINI_API_KEY) {
+  console.log('[AgriConnect] Gemini API key supplied by the server environment.');
+} else {
+  console.log(`[AgriConnect] Gemini API key ${process.env.GEMINI_API_KEY ? 'loaded' : 'not found'} in server environment.`);
+}
 
 async function startServer() {
   const app = express();
