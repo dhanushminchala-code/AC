@@ -325,6 +325,7 @@ ${context?.role ? `• User Role: ${context.role}` : '• User Role: Farmer'}
 ${context?.userName ? `• User Name: ${context.userName}` : ''}
 • Current Date: ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
 • Saved farm crops from the app (may be empty): ${JSON.stringify(context?.farmCrops || [])}
+• Farm crop data source: ${context?.farmCropsSource || 'unknown; do not assume records are verified'}
 • Market price lookup returned by this app: ${JSON.stringify(context?.marketSnapshot || null)}
 • Weather provider response: ${JSON.stringify(context?.weatherSnapshot || null)}
 • Buyer listings visible in this app: ${JSON.stringify(context?.buyerListings || [])}
