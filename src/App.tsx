@@ -343,7 +343,7 @@ export default function App() {
       </main>
 
       {/* Floating multilingual farming assistant available throughout the app */}
-      <AgriAIWidget lang={lang} currentUser={currentUser} />
+      <AgriAIWidget lang={lang} currentUser={currentUser} crops={farmerCrops} />
 
       {/* AgriLink Footer */}
       <Footer lang={lang} onNavigate={handleNavigate} />
