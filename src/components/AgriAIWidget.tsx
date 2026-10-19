@@ -173,9 +173,9 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
       ];
       const cropMention = cropTerms.find(([term]) => text.toLowerCase().includes(term));
       const cropForLookup = cropMention?.[1] || firstCrop?.cropKey || firstCrop?.name || '';
-      const weatherQueryMatch = text.match(/(?:weather|forecast|rain|temperature)\\s+(?:in|at|near|for)\\s+([a-zA-Z][a-zA-Z .,-]{1,55})/i);
+      const weatherQueryMatch = text.match(/(?:weather|forecast|rain|temperature)\s+(?:in|at|near|for)\s+([a-zA-Z][a-zA-Z .,-]{1,55})/i);
       const requestedWeatherLocation = weatherQueryMatch?.[1]
-        ?.split(/\\b(?:today|tomorrow|now|next|this week)\\b/i)[0]
+        ?.split(/\b(?:today|tomorrow|now|next|this week)\b/i)[0]
         .trim()
         .replace(/[,. ]+$/, '');
       const weatherSearchLocation = requestedWeatherLocation || weatherLocation;
