@@ -91,13 +91,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         return;
       }
 
-      // If OTP input is empty, dispatch OTP and open verification modal
-      await createAndSendOtp(identifier);
-      setShowOtpModal(true);
+      // If OTP input is empty, dispatch OTP and open verification modal only on success.
+      const sendResult = await createAndSendOtp(identifier);
+      if (sendResult.success) setShowOtpModal(true);
     } else {
       // Password mode: Verify credentials via strict mobile OTP
-      await createAndSendOtp(identifier);
-      setShowOtpModal(true);
+      const sendResult = await createAndSendOtp(identifier);
+      if (sendResult.success) setShowOtpModal(true);
     }
   };
 
