@@ -160,7 +160,7 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
         ? `${currentUser.apmc}${currentUser.state ? `, ${currentUser.state}` : ''}`
         : '';
       const weatherLocation = currentUser?.apmc
-        ? `${currentUser.apmc.replace(/\\s*APMC.*$/i, '').replace(/\\s*mandi.*$/i, '')}${currentUser.state ? `, ${currentUser.state}` : ''}`
+        ? `${currentUser.apmc.replace(/\s*APMC.*$/i, '').replace(/\s*mandi.*$/i, '')}${currentUser.state ? `, ${currentUser.state}` : ''}`
         : '';
       const savedCropRecords = (() => {
         try { return Boolean(localStorage.getItem('agriconnect_crops')); } catch { return false; }
