@@ -19,6 +19,8 @@ async function startServer() {
 
   // In-memory OTP storage: cleanMobile -> { otp, expiresAt, attempts }
   const otpStore = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
+  // Demo OTP is allowed only when explicitly enabled outside production.
+  const demoMode = process.env.OTP_DEMO_MODE === 'true' && process.env.NODE_ENV !== 'production';
 
   // API endpoint: Send OTP directly to mobile number
   app.post('/api/send-otp', async (req, res) => {
@@ -35,146 +37,79 @@ async function startServer() {
 
       const formattedPhone = mobile.toString().startsWith('+') ? mobile.toString().trim() : `+91${cleanMobile}`;
 
+      // Demo mode is deliberately opt-in and cannot run in production.
+      if (demoMode) {
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        otpStore.set(cleanMobile, { otp, expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0 });
+        console.log(`[AgriConnect DEMO MODE] Demo OTP generated for ${formattedPhone}; no SMS was sent.`);
+        return res.json({
+          success: true,
+          mode: 'demo',
+          message: 'DEMO MODE: No SMS was sent. Use the clearly labelled demonstration code.',
+          mobile: cleanMobile,
+          gateway: 'AgriConnect Demo',
+          smsDelivered: false,
+          devOtp: otp,
+        });
+      }
+
       const twilioSid = process.env.TWILIO_ACCOUNT_SID;
       const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
       const twilioVerifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
-      const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 
-      // 1. Primary: Twilio Verify Service (Industry standard for 2FA / OTP verification)
-      if (twilioSid && twilioAuth && twilioVerifyServiceSid) {
-        try {
-          const auth = Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64');
-          const params = new URLSearchParams();
-          params.append('To', formattedPhone);
-          params.append('Channel', 'sms');
-
-          const twRes = await fetch(
-            `https://verify.twilio.com/v2/Services/${twilioVerifyServiceSid}/Verifications`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Basic ${auth}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: params.toString(),
-            }
-          );
-
-          const twData = (await twRes.json()) as any;
-          if (twRes.ok && (twData.status === 'pending' || twData.status === 'approved')) {
-            console.log(`[Twilio Verify] Verification code dispatched to ${formattedPhone} (Status: ${twData.status})`);
-            return res.json({
-              success: true,
-              message: `OTP sent directly to mobile inbox at ${formattedPhone}`,
-              mobile: cleanMobile,
-              gateway: 'Twilio Verify',
-              smsDelivered: true,
-            });
-          } else {
-            console.warn('[Twilio Verify Notice]:', twData.message || twData);
-            // Twilio Trial account restriction or unverified recipient fallback:
-            // Generate secure demonstration OTP so student presentation never fails
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            otpStore.set(cleanMobile, {
-              otp,
-              expiresAt: Date.now() + 10 * 60 * 1000,
-              attempts: 0,
-            });
-
-            console.log(`\n======================================================`);
-            console.log(`[AgriConnect Demo Fallback] Twilio Verify Trial Mode`);
-            console.log(`MOBILE: ${formattedPhone}`);
-            console.log(`DEMO OTP CODE: ${otp}`);
-            console.log(`REASON: ${twData.message || 'Trial Account unverified tester'}`);
-            console.log(`======================================================\n`);
-
-            return res.json({
-              success: true,
-              message: 'Twilio Trial Mode: Demonstration OTP generated for evaluation.',
-              mobile: cleanMobile,
-              gateway: 'Twilio Trial Demo Sandbox',
-              smsDelivered: false,
-              devOtp: otp,
-            });
-          }
-        } catch (twErr) {
-          console.error('[Twilio Verify Network Error]:', twErr);
-          const otp = Math.floor(100000 + Math.random() * 900000).toString();
-          otpStore.set(cleanMobile, {
-            otp,
-            expiresAt: Date.now() + 10 * 60 * 1000,
-            attempts: 0,
-          });
-          return res.json({
-            success: true,
-            message: 'Network offline fallback: Demonstration OTP generated.',
-            mobile: cleanMobile,
-            gateway: 'Offline Demo Sandbox',
-            smsDelivered: false,
-            devOtp: otp,
-          });
-        }
+      if (!twilioSid || !twilioAuth || !twilioVerifyServiceSid) {
+        return res.status(503).json({
+          success: false,
+          mode: 'sms',
+          error: 'Real SMS verification is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID on the server.',
+        });
       }
 
-      // 2. Secondary Fallback: Twilio Programmable SMS (If configured with Phone Number instead of Verify Service)
-      let smsDelivered = false;
-      let gateway = 'telecom-simulated';
+      try {
+        const auth = Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64');
+        const params = new URLSearchParams();
+        params.append('To', formattedPhone);
+        params.append('Channel', 'sms');
 
-      // Generate local OTP for Programmable SMS or local development mode
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      otpStore.set(cleanMobile, {
-        otp,
-        expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes validity
-        attempts: 0,
-      });
-
-      if (twilioSid && twilioAuth && twilioPhone) {
-        try {
-          const auth = Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64');
-          const twilioParams = new URLSearchParams();
-          twilioParams.append('To', formattedPhone);
-          twilioParams.append('From', twilioPhone);
-          twilioParams.append('Body', `AgriConnect verification code: ${otp}. Valid for 10 minutes. Do not share.`);
-
-          const twRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+        const twRes = await fetch(
+          `https://verify.twilio.com/v2/Services/${twilioVerifyServiceSid}/Verifications`,
+          {
             method: 'POST',
             headers: {
               Authorization: `Basic ${auth}`,
               'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: twilioParams.toString(),
-          });
-          const msgData = (await twRes.json()) as any;
-          if (twRes.ok) {
-            smsDelivered = true;
-            gateway = 'Twilio Programmable SMS';
-            console.log(`[Twilio SMS] Live SMS sent to ${formattedPhone}!`);
-          } else {
-            console.error('[Twilio SMS Error]:', msgData);
+            body: params.toString(),
           }
-        } catch (twErr) {
-          console.error('[Twilio SMS Dispatch Error]:', twErr);
+        );
+        const twData = (await twRes.json()) as any;
+
+        if (twRes.ok && (twData.status === 'pending' || twData.status === 'approved')) {
+          console.log(`[Twilio Verify] Verification request accepted for ${formattedPhone}`);
+          return res.json({
+            success: true,
+            mode: 'sms',
+            message: `Verification request accepted for ${formattedPhone}. Check your SMS inbox.`,
+            mobile: cleanMobile,
+            gateway: 'Twilio Verify',
+            smsDelivered: true,
+          });
         }
+
+        console.warn('[Twilio Verify Send Error]:', twData.message || twData.code || 'Unknown Twilio error');
+        return res.status(502).json({
+          success: false,
+          mode: 'sms',
+          error: 'Twilio could not send the verification code. Check your Twilio Verify service, trial restrictions, and recipient number, then try again. No demo code was generated.',
+        });
+      } catch (twErr) {
+        console.error('[Twilio Verify Network Error]:', twErr);
+        return res.status(502).json({
+          success: false,
+          mode: 'sms',
+          error: 'Could not reach Twilio to send the verification code. Please try again. No demo code was generated.',
+        });
       }
-
-      const isConfigured = Boolean((twilioSid && twilioAuth && twilioVerifyServiceSid) || (twilioSid && twilioAuth && twilioPhone));
-
-      if (!isConfigured) {
-        console.log(`\n======================================================`);
-        console.log(`[AgriConnect Dev Mode] Twilio credentials not configured in .env`);
-        console.log(`DISPATCHING OTP TO MOBILE INBOX: ${formattedPhone}`);
-        console.log(`OTP CODE: ${otp}`);
-        console.log(`======================================================\n`);
-      }
-
-      return res.json({
-        success: true,
-        message: `OTP sent directly to mobile inbox at ${formattedPhone}`,
-        mobile: cleanMobile,
-        gateway,
-        smsDelivered,
-        devOtp: !isConfigured ? otp : undefined,
-      });
     } catch (err: any) {
       console.error('Send OTP error:', err);
       return res.status(500).json({ success: false, error: 'Internal server error while sending SMS' });
@@ -193,131 +128,72 @@ async function startServer() {
       const cleanEntered = otp.toString().trim();
       const formattedPhone = mobile.toString().startsWith('+') ? mobile.toString().trim() : `+91${cleanMobile}`;
 
+      // Local OTP verification is reachable only in explicitly enabled non-production demo mode.
+      if (demoMode) {
+        const record = otpStore.get(cleanMobile);
+        if (!record) {
+          return res.status(400).json({ success: false, error: 'No active demo code found. Request a new demo code.' });
+        }
+        if (Date.now() > record.expiresAt) {
+          otpStore.delete(cleanMobile);
+          return res.status(400).json({ success: false, error: 'Demo code expired. Request a new one.' });
+        }
+        record.attempts += 1;
+        if (record.attempts > 5) {
+          otpStore.delete(cleanMobile);
+          return res.status(429).json({ success: false, error: 'Too many incorrect attempts. Request a new demo code.' });
+        }
+        if (cleanEntered !== record.otp) {
+          return res.status(400).json({ success: false, error: 'Incorrect demo code. Please enter the displayed six-digit code.' });
+        }
+        otpStore.delete(cleanMobile);
+        return res.json({ success: true, mode: 'demo', message: 'Demo code accepted. This does not verify a real mobile number.' });
+      }
+
       const twilioSid = process.env.TWILIO_ACCOUNT_SID;
       const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
       const twilioVerifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
-      // Check local demo store first (active for unverified trial numbers or demo mode)
-      const localRecord = otpStore.get(cleanMobile);
-      if (localRecord) {
-        if (Date.now() > localRecord.expiresAt) {
-          otpStore.delete(cleanMobile);
-          return res.status(400).json({
-            success: false,
-            error: 'OTP has expired (10 minutes limit). Please request a new OTP.',
-          });
-        }
-        localRecord.attempts += 1;
-        if (localRecord.attempts > 5) {
-          otpStore.delete(cleanMobile);
-          return res.status(429).json({
-            success: false,
-            error: 'Too many incorrect attempts. Please request a new OTP.',
-          });
-        }
-        if (cleanEntered !== localRecord.otp) {
-          return res.status(400).json({
-            success: false,
-            error: 'Incorrect OTP. Please enter the exact 6-digit verification code.',
-          });
-        }
-        otpStore.delete(cleanMobile);
-        return res.json({
-          success: true,
-          message: 'Mobile number verified successfully!',
+      if (!twilioSid || !twilioAuth || !twilioVerifyServiceSid) {
+        return res.status(503).json({
+          success: false,
+          mode: 'sms',
+          error: 'Real SMS verification is not configured on the server. Demo codes are disabled in normal mode.',
         });
       }
 
-      // 1. If Twilio Verify is configured, verify via Twilio Verify Check API
-      if (twilioSid && twilioAuth && twilioVerifyServiceSid) {
-        try {
-          const auth = Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64');
-          const params = new URLSearchParams();
-          params.append('To', formattedPhone);
-          params.append('Code', cleanEntered);
+      try {
+        const auth = Buffer.from(`${twilioSid}:${twilioAuth}`).toString('base64');
+        const params = new URLSearchParams();
+        params.append('To', formattedPhone);
+        params.append('Code', cleanEntered);
 
-          const twRes = await fetch(
-            `https://verify.twilio.com/v2/Services/${twilioVerifyServiceSid}/VerificationCheck`,
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Basic ${auth}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: params.toString(),
-            }
-          );
-
-          const checkData = (await twRes.json()) as any;
-
-          if (twRes.ok && checkData.status === 'approved') {
-            console.log(`[Twilio Verify] OTP check approved for ${formattedPhone}`);
-            return res.json({
-              success: true,
-              message: 'Mobile number verified successfully via Twilio Verify!',
-            });
-          } else {
-            console.warn(`[Twilio Verify] OTP check failed for ${formattedPhone}:`, checkData.status || checkData.message);
-            const errorMsg =
-              checkData.status === 'pending'
-                ? 'Incorrect OTP. Please check your SMS inbox and enter the exact 6-digit code.'
-                : (checkData.code === 20404 || checkData.status === 404 || checkData.message?.includes('not found'))
-                ? 'No active verification found or OTP has already been verified. Please request a new OTP.'
-                : checkData.message || 'OTP verification failed or has expired. Please request a new OTP.';
-            return res.status(400).json({
-              success: false,
-              error: errorMsg,
-            });
+        const twRes = await fetch(
+          `https://verify.twilio.com/v2/Services/${twilioVerifyServiceSid}/VerificationCheck`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${auth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString(),
           }
-        } catch (twErr) {
-          console.error('[Twilio Verify Check Error]:', twErr);
-          return res.status(500).json({
-            success: false,
-            error: 'Failed to verify OTP with Twilio Verify service. Please try again.',
-          });
+        );
+        const checkData = (await twRes.json()) as any;
+
+        if (twRes.ok && checkData.status === 'approved') {
+          console.log(`[Twilio Verify] OTP approved for ${formattedPhone}`);
+          return res.json({ success: true, mode: 'sms', message: 'Mobile number verified successfully via Twilio Verify.' });
         }
+
+        const errorMsg = checkData.status === 'pending'
+          ? 'Incorrect OTP. Check your SMS inbox and enter the six-digit code.'
+          : 'OTP verification failed or expired. Request a new SMS code.';
+        return res.status(400).json({ success: false, mode: 'sms', error: errorMsg });
+      } catch (twErr) {
+        console.error('[Twilio Verify Check Error]:', twErr);
+        return res.status(502).json({ success: false, mode: 'sms', error: 'Could not verify the code with Twilio. Please try again.' });
       }
-
-      // 2. In-memory OTP verification (for Twilio Programmable SMS or local development mode)
-      const record = otpStore.get(cleanMobile);
-
-      if (!record) {
-        return res.status(400).json({
-          success: false,
-          error: 'No active OTP request found for this mobile number. Please click "Resend OTP".',
-        });
-      }
-
-      if (Date.now() > record.expiresAt) {
-        otpStore.delete(cleanMobile);
-        return res.status(400).json({
-          success: false,
-          error: 'OTP has expired (10 minutes limit). Please request a new OTP.',
-        });
-      }
-
-      record.attempts += 1;
-      if (record.attempts > 5) {
-        otpStore.delete(cleanMobile);
-        return res.status(429).json({
-          success: false,
-          error: 'Too many incorrect attempts. Please request a new OTP.',
-        });
-      }
-
-      if (cleanEntered !== record.otp) {
-        return res.status(400).json({
-          success: false,
-          error: 'Incorrect OTP. Please check your message inbox and enter the exact 6-digit code.',
-        });
-      }
-
-      // Verification successful! Clean up OTP record
-      otpStore.delete(cleanMobile);
-      return res.json({
-        success: true,
-        message: 'Mobile number verified successfully!',
-      });
     } catch (err: any) {
       console.error('Verify OTP error:', err);
       return res.status(500).json({ success: false, error: 'Internal server error during OTP verification' });
