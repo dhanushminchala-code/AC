@@ -540,12 +540,15 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
 
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsExpanded(false);
+                }}
                 aria-label="Close chat"
                 title="Close AgriConnect AI"
-                className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/50 bg-white/15 text-white shadow-sm transition hover:bg-rose-600 hover:border-white focus:outline-none focus:ring-2 focus:ring-white"
+                className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-emerald-950/40 text-white shadow-md transition-colors hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-700"
               >
-                <X className="w-5 h-5" />
+                <X size={22} strokeWidth={2.75} aria-hidden="true" />
               </button>
             </div>
           </div>
