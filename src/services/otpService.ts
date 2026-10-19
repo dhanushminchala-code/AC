@@ -16,7 +16,7 @@ export interface VerifyOtpResult {
 }
 
 export async function requestMobileOtp(mobile: string): Promise<SendOtpResult> {
-  const cleanMobile = mobile.replace(/\\D/g, '').slice(-10);
+  const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
   if (cleanMobile.length !== 10) {
     return { success: false, message: 'Please enter a valid 10-digit mobile number.', error: 'Invalid mobile number' };
   }
@@ -39,9 +39,9 @@ export async function requestMobileOtp(mobile: string): Promise<SendOtpResult> {
 }
 
 export async function verifyMobileOtp(mobile: string, enteredOtp: string): Promise<VerifyOtpResult> {
-  const cleanMobile = mobile.replace(/\\D/g, '').slice(-10);
+  const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
   const cleanEntered = enteredOtp.trim();
-  if (!/^\\d{6}$/.test(cleanEntered)) {
+  if (!/^\d{6}$/.test(cleanEntered)) {
     return { success: false, error: 'Please enter all six digits of the verification code.' };
   }
 
