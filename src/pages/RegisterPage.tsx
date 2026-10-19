@@ -39,9 +39,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({
 
   const createAndSendOtp = async () => {
     const res = await requestMobileOtp(mobileNumber);
-    if (res.devOtp) {
-      setGeneratedOtp(res.devOtp);
+    setGeneratedOtp(res.success && res.mode === 'demo' ? (res.devOtp || '') : '');
+    if (!res.success) {
+      setValidationError(res.error || res.message || 'Could not send verification code.');
+      return res;
     }
+    setValidationError('');
     setShowOtpModal(true);
     return res;
   };
