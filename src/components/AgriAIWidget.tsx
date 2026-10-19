@@ -166,15 +166,27 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
         try { return Boolean(localStorage.getItem('agriconnect_crops')); } catch { return false; }
       })();
       const firstCrop = crops?.[0];
-      const cropForLookup = firstCrop?.cropKey || firstCrop?.name || '';
+      const cropTerms: Array<[string, string]> = [
+        ['tomato', 'tomato'], ['paddy', 'paddy'], ['rice', 'paddy'],
+        ['chilli', 'chilli'], ['chili', 'chilli'], ['cotton', 'cotton'],
+        ['potato', 'potato'], ['maize', 'maize'], ['corn', 'maize'],
+      ];
+      const cropMention = cropTerms.find(([term]) => text.toLowerCase().includes(term));
+      const cropForLookup = cropMention?.[1] || firstCrop?.cropKey || firstCrop?.name || '';
+      const weatherQueryMatch = text.match(/(?:weather|forecast|rain|temperature)\\s+(?:in|at|near|for)\\s+([a-zA-Z][a-zA-Z .,-]{1,55})/i);
+      const requestedWeatherLocation = weatherQueryMatch?.[1]
+        ?.split(/\\b(?:today|tomorrow|now|next|this week)\\b/i)[0]
+        .trim()
+        .replace(/[,. ]+$/, '');
+      const weatherSearchLocation = requestedWeatherLocation || weatherLocation;
       const [marketSnapshot, weatherSnapshot] = await Promise.all([
         cropForLookup && location
           ? fetch(`/api/market-prices?crop=${encodeURIComponent(cropForLookup)}&location=${encodeURIComponent(location)}&radius=150`)
               .then(async (r) => r.ok ? (await r.json())?.data || null : null)
               .catch(() => null)
           : Promise.resolve(null),
-        weatherLocation
-          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(weatherLocation)}`)
+        weatherSearchLocation
+          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(weatherSearchLocation)}`)
               .then(async (r) => r.ok ? await r.json() : null)
               .catch(() => null)
           : Promise.resolve(null),
