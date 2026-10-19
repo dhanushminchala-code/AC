@@ -11,6 +11,7 @@ import { FarmerDashboardPage } from './pages/FarmerDashboardPage';
 import { SellCropPage } from './pages/SellCropPage';
 import { BuyerDashboardPage } from './pages/BuyerDashboardPage';
 import { NotificationModal } from './components/NotificationModal';
+import { AgriAIWidget } from './components/AgriAIWidget';
 import { initialFarmerCrops, recentActivities } from './data/mockData';
 import { CheckCircle2, X } from 'lucide-react';
 
@@ -340,6 +341,9 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Floating multilingual farming assistant available throughout the app */}
+      <AgriAIWidget lang={lang} currentUser={currentUser} crops={farmerCrops} />
 
       {/* AgriLink Footer */}
       <Footer lang={lang} onNavigate={handleNavigate} />

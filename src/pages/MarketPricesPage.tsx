@@ -33,8 +33,10 @@ export const MarketPricesPage: React.FC<MarketPricesPageProps> = ({ lang, onNavi
 
   const [isLocating, setIsLocating] = useState(false);
   const [locationNotice, setLocationNotice] = useState<{ type: 'success' | 'warning' | 'info'; text: string } | null>(null);
+  const [apiMandis, setApiMandis] = useState<MandiComparison[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const mandis = mandiComparisonsData[selectedCrop] || mandiComparisonsData.tomato;
+  const mandis = apiMandis ?? (mandiComparisonsData[selectedCrop] || mandiComparisonsData.tomato);
   const recommendedMandi = mandis.find((m) => m.isRecommended) || mandis[0];
 
   // Calculate stats
@@ -43,6 +45,36 @@ export const MarketPricesPage: React.FC<MarketPricesPageProps> = ({ lang, onNavi
   const lowestPrice = Math.min(...prices);
   const avgPrice = (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2);
   const modalPrice = (prices.slice().sort()[Math.floor(prices.length / 2)]).toFixed(2);
+
+  const handleFindPrices = async () => {
+    if (!selectedLocation.trim()) {
+      setLocationNotice({ type: 'warning', text: 'Please enter a village, city, or select a nearby APMC market.' });
+      return;
+    }
+    setIsSearching(true);
+    setLocationNotice({ type: 'info', text: 'Searching available benchmark prices for your selected crop and location…' });
+    try {
+      const radiusKm = Number.parseInt(radius, 10) || 150;
+      const response = await fetch(`/api/market-prices?crop=${encodeURIComponent(selectedCrop)}&location=${encodeURIComponent(selectedLocation)}&radius=${radiusKm}`);
+      const payload = await response.json();
+      if (!response.ok || !payload?.success || !Array.isArray(payload?.data?.mandis) || payload.data.mandis.length === 0) {
+        throw new Error(payload?.error || 'No market results were returned. Please try a nearby APMC market.');
+      }
+      setApiMandis(payload.data.mandis);
+      setLocationNotice({
+        type: 'success',
+        text: `${payload.data.mandis.length} market result(s) found for ${selectedLocation}. These are demonstration benchmark estimates, not verified live prices.`,
+      });
+    } catch (error) {
+      setLocationNotice({
+        type: 'warning',
+        text: error instanceof Error ? `${error.message} Showing the page's sample comparison until the API is available.` : 'Market search failed. Showing sample comparison data.',
+      });
+      setApiMandis(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleOpenDetails = (mandi: MandiComparison) => {
     setActiveMandiForModal(mandi);
@@ -148,7 +180,7 @@ export const MarketPricesPage: React.FC<MarketPricesPageProps> = ({ lang, onNavi
               <div className="relative">
                 <select
                   value={selectedCrop}
-                  onChange={(e) => setSelectedCrop(e.target.value as any)}
+                  onChange={(e) => { setSelectedCrop(e.target.value as any); setApiMandis(null); }}
                   className="w-full pl-3 pr-8 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 >
                   <option value="tomato">🍅 Tomato</option>
@@ -231,10 +263,12 @@ export const MarketPricesPage: React.FC<MarketPricesPageProps> = ({ lang, onNavi
             <div className="lg:col-span-2">
               <button
                 type="button"
-                className="w-full py-2.5 px-4 bg-[#0e6834] hover:bg-[#0b542a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition active:scale-98"
+                onClick={handleFindPrices}
+                disabled={isSearching}
+                className="w-full py-2.5 px-4 bg-[#0e6834] hover:bg-[#0b542a] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition active:scale-98 disabled:opacity-60 disabled:cursor-wait"
               >
-                <Search className="w-4 h-4" />
-                <span>Find Prices</span>
+                {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                <span>{isSearching ? 'Searching…' : 'Find Prices'}</span>
               </button>
             </div>
           </div>

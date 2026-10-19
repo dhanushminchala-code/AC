@@ -206,14 +206,14 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
               {/* Recipient Notice */}
               <div className="text-center space-y-1.5">
                 <p className="text-xs text-gray-500">
-                  We have sent an SMS with a 6-digit verification code to
+                  {expectedOtp ? 'DEMO MODE: No SMS was sent. Use the demonstration code below.' : 'We have requested an SMS with a 6-digit verification code for'}
                 </p>
                 <p className="text-base font-extrabold text-gray-900 tracking-wide">
                   {cleanMobileDigits ? `+91 ${cleanMobileDigits}` : (mobile || 'Your Registered Mobile')}
                 </p>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-[11px] font-semibold border border-emerald-200/60">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                  <span>Delivered to your mobile inbox via SMS</span>
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${expectedOtp ? 'bg-amber-50 text-amber-900 border-amber-300' : 'bg-emerald-50 text-emerald-800 border-emerald-200/60'}`}>
+                  <span className={`w-2 h-2 rounded-full ${expectedOtp ? 'bg-amber-500' : 'bg-emerald-600 animate-pulse'}`} />
+                  <span>{expectedOtp ? 'DEMO ONLY — NOT REAL SMS VERIFICATION' : 'SMS verification requested'}</span>
                 </div>
               </div>
 
@@ -301,7 +301,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-1.5 font-bold text-[11px] text-amber-900 uppercase tracking-wide">
                         <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        Demo Sandbox (Zero SMS Cost)
+                        DEMO MODE — NOT A REAL SMS
                       </span>
                       <button
                         type="button"
@@ -323,7 +323,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
                       </code>
                     </div>
                     <p className="text-[10px] text-amber-700/80 leading-tight">
-                      For live carrier SMS to phone inboxes, configure Twilio Verify in <code>.env</code>.
+                      Demo mode is for local presentations only. Real mobile verification requires Twilio Verify configured on the server.
                     </p>
                   </div>
                 </div>

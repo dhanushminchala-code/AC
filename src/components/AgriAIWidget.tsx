@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Language, UserProfile } from '../types';
+import { Language, UserProfile, FarmerCropItem } from '../types';
+import { recommendedBuyersList } from '../data/mockData';
 import {
   MessageSquare,
   X,
@@ -22,6 +23,7 @@ import {
 interface AgriAIWidgetProps {
   lang: Language;
   currentUser?: UserProfile | null;
+  crops: FarmerCropItem[];
 }
 
 interface ChatMessage {
@@ -68,7 +70,7 @@ const SUGGESTED_PROMPTS = [
   },
 ];
 
-export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser }) => {
+export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, crops }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState<string>('auto');
   const [input, setInput] = useState('');
@@ -154,6 +156,52 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
         text: m.text,
       }));
 
+      const location = currentUser?.apmc
+        ? `${currentUser.apmc}${currentUser.state ? `, ${currentUser.state}` : ''}`
+        : '';
+      const weatherLocation = currentUser?.apmc
+        ? `${currentUser.apmc.replace(/\s*APMC.*$/i, '').replace(/\s*mandi.*$/i, '')}${currentUser.state ? `, ${currentUser.state}` : ''}`
+        : '';
+      const savedCropRecords = (() => {
+        try { return Boolean(localStorage.getItem('agriconnect_crops')); } catch { return false; }
+      })();
+      const firstCrop = crops?.[0];
+      const cropTerms: Array<[string, string]> = [
+        ['tomato', 'tomato'], ['paddy', 'paddy'], ['rice', 'paddy'],
+        ['chilli', 'chilli'], ['chili', 'chilli'], ['cotton', 'cotton'],
+        ['potato', 'potato'], ['maize', 'maize'], ['corn', 'maize'],
+      ];
+      const cropMention = cropTerms.find(([term]) => text.toLowerCase().includes(term));
+      const cropForLookup = cropMention?.[1] || firstCrop?.cropKey || firstCrop?.name || '';
+      const weatherQueryMatch = text.match(/(?:weather|forecast|rain|temperature)\s+(?:in|at|near|for)\s+([a-zA-Z][a-zA-Z .,-]{1,55})/i);
+      const requestedWeatherLocation = weatherQueryMatch?.[1]
+        ?.split(/\b(?:today|tomorrow|now|next|this week)\b/i)[0]
+        .trim()
+        .replace(/[,. ]+$/, '');
+      const weatherSearchLocation = requestedWeatherLocation || weatherLocation;
+      const [marketSnapshot, weatherSnapshot] = await Promise.all([
+        cropForLookup && location
+          ? fetch(`/api/market-prices?crop=${encodeURIComponent(cropForLookup)}&location=${encodeURIComponent(location)}&radius=150`)
+              .then(async (r) => r.ok ? (await r.json())?.data || null : null)
+              .catch(() => null)
+          : Promise.resolve(null),
+        weatherSearchLocation
+          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(weatherSearchLocation)}`)
+              .then(async (r) => r.ok ? await r.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      const buyerListings = recommendedBuyersList.slice(0, 10).map((buyer) => ({
+        companyName: buyer.companyName,
+        businessType: buyer.businessType,
+        requiredCrop: buyer.requiredCrop,
+        quantity: buyer.quantity,
+        location: buyer.location,
+        offeredPrice: buyer.offeredPrice,
+        sourceStatus: 'demo/sample listing; not a verified live offer',
+      }));
+
       const res = await fetch('/api/agri-ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +211,18 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
           context: {
             userName: currentUser?.name,
             role: currentUser?.role,
-            location: currentUser?.state ? `${currentUser.apmc || 'APMC'}, ${currentUser.state}` : 'Andhra Pradesh',
+            location: location || '',
+            farmCrops: (crops || []).map((crop) => ({
+              name: crop.name,
+              cropKey: crop.cropKey,
+              quantity: crop.quantity,
+              expectedPrice: crop.price,
+            })),
+            farmCropsSource: savedCropRecords ? 'localStorage app crop records' : 'demo starter crop records; not confirmed farmer data',
+            marketSnapshot,
+            weatherSnapshot,
+            buyerListings,
+            soilData: null,
           },
         }),
       });
@@ -434,7 +493,7 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
         >
           {/* Header Bar */}
           <div className="bg-gradient-to-r from-[#0e6834] via-emerald-700 to-green-700 text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0 shadow-md">
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center border border-white/20 shadow-xs">
                 <Bot className="w-6 h-6 text-white" />
               </div>
@@ -453,12 +512,12 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
             </div>
 
             {/* Actions: Language selector, Expand, Close */}
-            <div className="flex items-center gap-1.5">
-              <div className="relative">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <div className="relative shrink-0">
                 <select
                   value={selectedLang}
                   onChange={(e) => setSelectedLang(e.target.value)}
-                  className="bg-black/25 hover:bg-black/40 text-white text-[11px] font-semibold py-1 px-2 pr-6 rounded-lg border border-white/20 focus:outline-hidden cursor-pointer appearance-none"
+                  className="max-w-[108px] sm:max-w-none bg-black/25 hover:bg-black/40 text-white text-[11px] font-semibold py-1 px-2 pr-6 rounded-lg border border-white/20 focus:outline-hidden cursor-pointer appearance-none"
                   title="Choose conversation language"
                 >
                   {SUPPORTED_LANGUAGES.map((l) => (
@@ -481,11 +540,15 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser })
 
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsExpanded(false);
+                }}
                 aria-label="Close chat"
-                className="p-1.5 rounded-lg hover:bg-white/15 text-white transition cursor-pointer"
+                title="Close AgriConnect AI"
+                className="ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-emerald-950/40 text-white shadow-md transition-colors hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-emerald-700"
               >
-                <X className="w-5 h-5" />
+                <X size={22} strokeWidth={2.75} aria-hidden="true" />
               </button>
             </div>
           </div>

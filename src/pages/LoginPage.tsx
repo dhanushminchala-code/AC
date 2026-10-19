@@ -38,8 +38,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const createAndSendOtp = async (forMobile: string) => {
     const res = await requestMobileOtp(forMobile);
-    if (res.devOtp) {
-      setGeneratedOtp(res.devOtp);
+    setGeneratedOtp(res.success && res.mode === 'demo' ? (res.devOtp || '') : '');
+    if (!res.success) {
+      setErrorMsg(res.error || res.message || 'Could not send verification code.');
     }
     return res;
   };
@@ -50,8 +51,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       return;
     }
     setErrorMsg('');
-    await createAndSendOtp(identifier);
-    setShowOtpModal(true);
+    const result = await createAndSendOtp(identifier);
+    if (result.success) setShowOtpModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,13 +91,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         return;
       }
 
-      // If OTP input is empty, dispatch OTP and open verification modal
-      await createAndSendOtp(identifier);
-      setShowOtpModal(true);
+      // If OTP input is empty, dispatch OTP and open verification modal only on success.
+      const sendResult = await createAndSendOtp(identifier);
+      if (sendResult.success) setShowOtpModal(true);
     } else {
       // Password mode: Verify credentials via strict mobile OTP
-      await createAndSendOtp(identifier);
-      setShowOtpModal(true);
+      const sendResult = await createAndSendOtp(identifier);
+      if (sendResult.success) setShowOtpModal(true);
     }
   };
 
