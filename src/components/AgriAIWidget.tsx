@@ -159,6 +159,9 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
       const location = currentUser?.apmc
         ? `${currentUser.apmc}${currentUser.state ? `, ${currentUser.state}` : ''}`
         : '';
+      const weatherLocation = currentUser?.apmc
+        ? `${currentUser.apmc.replace(/\\s*APMC.*$/i, '').replace(/\\s*mandi.*$/i, '')}${currentUser.state ? `, ${currentUser.state}` : ''}`
+        : '';
       const savedCropRecords = (() => {
         try { return Boolean(localStorage.getItem('agriconnect_crops')); } catch { return false; }
       })();
@@ -170,8 +173,8 @@ export const AgriAIWidget: React.FC<AgriAIWidgetProps> = ({ lang, currentUser, c
               .then(async (r) => r.ok ? (await r.json())?.data || null : null)
               .catch(() => null)
           : Promise.resolve(null),
-        location
-          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(location)}`)
+        weatherLocation
+          ? fetch(`/api/agri-ai/weather?location=${encodeURIComponent(weatherLocation)}`)
               .then(async (r) => r.ok ? await r.json() : null)
               .catch(() => null)
           : Promise.resolve(null),
